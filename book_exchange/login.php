@@ -16,9 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->fetch();
 
     if ($stmt->num_rows > 0 && password_verify($password, $hashed_password)) {
+        // ✅ Set session variables that resource module expects
+        $_SESSION['user_logged_in'] = true;
         $_SESSION['user_id'] = $id;
         $_SESSION['user_name'] = $name;
-        header("Location: profile.php");
+
+        // Redirect to user dashboard
+        header("Location: user_dashboard.php");
         exit();
     } else {
         $message = "❌ Invalid email or password!";
@@ -40,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container">
         <h2>Login</h2>
 
-        <!-- Display Message -->
         <?php if (!empty($message)) echo "<p class='message'>$message</p>"; ?>
 
         <form method="POST">
@@ -54,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <button type="submit">Login</button>
         </form>
 
-        <a href="register.php">Don't have an account? Register</a>
+        <a href="register.php">Don't have an account? Register</a><br>
         <a href="forgot_password.php">Forgot Password?</a>
     </div>
 

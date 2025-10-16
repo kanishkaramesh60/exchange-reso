@@ -3,7 +3,7 @@ session_start();
 include 'db.php';
 
 // ✅ Redirect already logged-in admin
-if(isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true){
+if(isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'admin'){
     header("Location: admin_dashboard.php");
     exit();
 }
@@ -20,9 +20,10 @@ if(isset($_POST['login'])){
     if($result->num_rows == 1){
         $row = $result->fetch_assoc();
         if(password_verify($password, $row['password'])){
-            // ✅ Set session variables
-            $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_id'] = $row['admin_id'];
+            // ✅ Set consistent session variables
+            $_SESSION['user_id'] = $row['admin_id'];
+            $_SESSION['user_name'] = $row['name']; // make sure your table has 'name'
+            $_SESSION['role'] = 'admin';
 
             // ✅ Close statement and connection before redirect
             $stmt->close();

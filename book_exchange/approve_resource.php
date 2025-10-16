@@ -2,26 +2,30 @@
 session_start();
 include 'db.php';
 
-if (!isset($_SESSION['admin_logged_in'])) {
+// ✅ Only allow admins
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: admin_login.php");
     exit();
 }
 
-if (isset($_GET['id'])) {
-    $resource_id = $_GET['id'];
+// ✅ Process approve/reject
+if (isset($_GET['id']) && isset($_GET['action'])) {
+    $resource_id = intval($_GET['id']);
+    $action = $_GET['action'];
 
-    $stmt = $conn->prepare("UPDATE resources SET status = 'approved' WHERE resource_id = ?");
-    $stmt->bind_param("i", $resource_id);
-    $stmt->execute();
-
-    // Close statement and connection
-    $stmt->close();
-    $conn->close();
-
-    // Redirect back to dashboard
-    header("Location: admin_dashboard.php");
-    exit();
-} else {
-    echo "Invalid request.";
+    if (in_array($action, ['approve', 'reject'])) {
+        $stmt = $conn->prepare("UPDATE resources SET status=? WHERE resource_id=?");
+        $stmt->bind_param("si", $action, $resource_id);
+        if ($stmt->execute()) {
+            $_SESSION['message'] = "Resource has been " . ucfirst($action) . "d successfully.";
+        } else {
+            $_SESSION['message'] = "Error: " . $conn->error;
+        }
+        $stmt->close();
+    }
 }
+
+// ✅ Redirect back to admin dashboard
+header("Location: admin_dashboard.php");
+exit();
 ?>
