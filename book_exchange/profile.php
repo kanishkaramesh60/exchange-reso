@@ -11,50 +11,34 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $message = '';
 
-// Fetch current user details
-$stmt = $conn->prepare("SELECT name, email, phone FROM users WHERE id = ?");
+// ✅ Fetch current user details
+$stmt = $conn->prepare("SELECT name, email, location FROM users WHERE id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $stmt->close();
 
-// Handle form submission
+// ✅ Handle profile update
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
     $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
-    $password = trim($_POST['password']);
-    $confirm_password = trim($_POST['confirm_password']);
+    $location = trim($_POST['location']);
 
-    // Validate password if entered
-    $update_password = false;
-    if (!empty($password)) {
-        if ($password !== $confirm_password) {
-            $message = "<p class='error'>❌ Passwords do not match.</p>";
-        } else {
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $update_password = true;
-        }
+    $stmt = $conn->prepare("UPDATE users SET name=?, email=?, location=? WHERE id=?");
+    $stmt->bind_param("sssi", $name, $email, $location, $user_id);
+
+    if ($stmt->execute()) {
+        $message = "<p class='success'>✅ Profile updated successfully.</p>";
+        $_SESSION['user_name'] = $name;
+        // Refresh updated data
+        $user['name'] = $name;
+        $user['email'] = $email;
+        $user['location'] = $location;
+    } else {
+        $message = "<p class='error'>❌ Failed to update: " . htmlspecialchars($stmt->error) . "</p>";
     }
-
-    if ($message === '') {
-        if ($update_password) {
-            $stmt = $conn->prepare("UPDATE users SET name=?, email=?, phone=?, password=? WHERE id=?");
-            $stmt->bind_param("ssssi", $name, $email, $phone, $hashed_password, $user_id);
-        } else {
-            $stmt = $conn->prepare("UPDATE users SET name=?, email=?, phone=? WHERE id=?");
-            $stmt->bind_param("sssi", $name, $email, $phone, $user_id);
-        }
-
-        if ($stmt->execute()) {
-            $message = "<p class='success'>✅ Details updated successfully.</p>";
-            $_SESSION['user_name'] = $name; // update session name
-        } else {
-            $message = "<p class='error'>❌ Failed to update details: " . $stmt->error . "</p>";
-        }
-        $stmt->close();
-    }
+    $stmt->close();
 }
 $conn->close();
 ?>
@@ -63,54 +47,161 @@ $conn->close();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>My Profile - Book Exchange</title>
+    <title>My Profile</title>
     <link rel="stylesheet" href="dashboard.css">
     <style>
-        .container { width: 40%; margin: auto; background: #f5f5f5; padding: 20px; border-radius: 10px; }
-        h2 { text-align: center; }
-        form input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 5px; border: 1px solid #ccc; }
-        button { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background-color: #45a049; }
-        .success { color: green; text-align: center; font-weight: bold; }
-        .error { color: red; text-align: center; font-weight: bold; }
-        nav { text-align: center; margin-bottom: 20px; }
-        nav a { margin: 0 10px; color: #4CAF50; text-decoration: none; font-weight: bold; }
-        nav a:hover { text-decoration: underline; }
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        header nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            font-weight: bold;
+        }
+
+        header nav a:hover { text-decoration: underline; }
+
+        .container {
+            flex: 1;
+            width: 90%;
+            max-width: 500px;
+            margin: 30px auto;
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .profile-field {
+            margin: 15px 0;
+        }
+
+        label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        input {
+            width: 100%;
+            border: none;
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 15px;
+            color: #333;
+            transition: background 0.3s;
+        }
+
+        input[readonly] {
+            background: #e9e9e9;
+            cursor: not-allowed;
+        }
+
+        button {
+            background: #218838;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        button:hover { background: #1e7e34; }
+
+        .success { text-align: center; color: green; font-weight: bold; }
+        .error { text-align: center; color: red; font-weight: bold; }
+
+        footer {
+            color: white;
+            text-align: center;
+            padding: 15px 0;
+            margin-top: auto;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>My Profile</h2>
-
+<header>
+    <h1>👤 My Profile</h1>
     <nav>
-        <a href="user_dashboard.php">Dashboard</a> |
-        <a href="upload_resource.php">Add Resource</a> |
-        <a href="all_resources.php">All Resources</a> |
+        <a href="user_dashboard.php">Dashboard</a>
+        <a href="upload_resource.php">Add Resource</a>
+        <a href="all_resources.php">All Resources</a>
         <a href="logout.php">Logout</a>
     </nav>
+</header>
 
+<div class="container">
+    <h2>Profile Details</h2>
     <?= $message ?>
 
-    <form method="POST">
-        <label for="name">Name:</label>
-        <input type="text" name="name" id="name" value="<?= htmlspecialchars($user['name']) ?>" required>
+    <form method="POST" id="profileForm">
+        <div class="profile-field">
+            <label>Name:</label>
+            <input type="text" name="name" id="name" value="<?= htmlspecialchars($user['name']) ?>" readonly>
+        </div>
 
-        <label for="email">Email:</label>
-        <input type="email" name="email" id="email" value="<?= htmlspecialchars($user['email']) ?>" required>
+        <div class="profile-field">
+            <label>Email:</label>
+            <input type="email" name="email" id="email" value="<?= htmlspecialchars($user['email']) ?>" readonly>
+        </div>
 
-        <label for="phone">Phone:</label>
-        <input type="text" name="phone" id="phone" value="<?= htmlspecialchars($user['phone']) ?>">
+        <div class="profile-field">
+            <label>Location:</label>
+            <input type="text" name="location" id="location" value="<?= htmlspecialchars($user['location'] ?? '') ?>" readonly>
+        </div>
 
-        <label for="password">New Password (leave blank to keep current):</label>
-        <input type="password" name="password" id="password">
-
-        <label for="confirm_password">Confirm New Password:</label>
-        <input type="password" name="confirm_password" id="confirm_password">
-
-        <button type="submit">Update Profile</button>
+        <button type="button" id="editBtn" onclick="enableAll()">✏️ Edit Details</button>
+        <button type="submit" id="saveBtn" style="display:none;">💾 Save Changes</button>
     </form>
 </div>
+
+<footer>
+    <p>&copy; <?= date('Y'); ?> Resource Exchange | Made with ❤️ by Students</p>
+</footer>
+
+<script>
+function enableAll() {
+    const inputs = document.querySelectorAll('#profileForm input');
+    inputs.forEach(input => {
+        input.readOnly = false;
+        input.style.background = '#fff';
+    });
+
+    document.getElementById('editBtn').style.display = 'none';
+    document.getElementById('saveBtn').style.display = 'block';
+}
+</script>
 
 </body>
 </html>

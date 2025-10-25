@@ -8,25 +8,33 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+$user_id = $_SESSION['user_id'];
 $message = '';
 $image_preview = '';
+
+// Fetch user name safely from DB
+$stmt = $conn->prepare("SELECT name FROM users WHERE id=?");
+if (!$stmt) { die("Prepare failed: ".$conn->error); }
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stmt->bind_result($user_name);
+$stmt->fetch();
+$stmt->close();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $description = trim($_POST['description']);
     $category = trim($_POST['category']);
-    $user_id = $_SESSION['user_id'];
+    $added_by = $user_id;
 
-    // ✅ Handle image upload
+    // Handle image upload
     $image_path = NULL;
     if (!empty($_FILES['image']['name'])) {
         $target_dir = "uploads/";
         if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
 
-        // Sanitize file name
         $filename = basename($_FILES['image']['name']);
         $filename = preg_replace("/[^a-zA-Z0-9_\.-]/", "_", $filename);
-
         $target_file = $target_dir . time() . "_" . $filename;
 
         $file_type = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
@@ -44,22 +52,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ✅ Insert into database if no error
+    // Insert into database
     if ($message === '') {
-        $stmt = $conn->prepare("INSERT INTO resources (user_id, title, description, category, image, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
-        if (!$stmt) {
-            die("Prepare failed: " . $conn->error);
-        }
-
-        $stmt->bind_param("issss", $user_id, $title, $description, $category, $image_path);
-
+        $stmt = $conn->prepare("INSERT INTO resources (added_by, title, description, category, image, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
+        if (!$stmt) { die("Prepare failed: ".$conn->error); }
+        $stmt->bind_param("issss", $added_by, $title, $description, $category, $image_path);
         if ($stmt->execute()) {
             $message = "<p class='success'>✅ Resource added successfully! Waiting for admin approval.</p>";
-            $image_preview = ''; // reset preview after successful upload
+            $image_preview = '';
         } else {
             $message = "<p class='error'>❌ Failed to add resource: " . $stmt->error . "</p>";
         }
-
         $stmt->close();
     }
 }
@@ -70,61 +73,123 @@ $conn->close();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Add Resource - Book Exchange</title>
-    <link rel="stylesheet" href="dashboard.css">
+<meta charset="UTF-8">
+<title>Add Resource - Book Exchange</title>
+<link rel="stylesheet" href="dashboard.css">
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #eef1f7;
+    margin: 0;
+    padding: 0;
+}
+header {
+    color: #fff;
+    padding: 15px;
+    text-align: center;
+}
+nav a {
+    color: #fff;
+    text-decoration: none;
+    margin: 0 10px;
+    font-weight: bold;
+}
+nav a:hover { text-decoration: underline; }
+.container {
+    width: 50%;
+    margin: 40px auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+h2 {
+    text-align: center;
+    color: #333;
+}
+input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    margin: 8px 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+button {
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+button:hover {
+    background-color: #03a531ff;
+}
+.success {
+    color: #5cb85c;
+    text-align: center;
+    font-weight: bold;
+}
+.error {
+    color: #d9534f;
+    text-align: center;
+    font-weight: bold;
+}
+footer {
+    text-align: center;
+    padding: 10px;
+    color: white;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+img {
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+</style>
 </head>
 <body>
-    <header>
-        <h1>📚 Book Exchange</h1>
-        <nav>
-            <a href="user_dashboard.php">Dashboard</a>
-            <a href="upload_resource.php">Add Resource</a>
-            <a href="logout.php">Logout</a>
-        </nav>
-    </header>
+<header>
+    <h1>📚 Resource Exchange</h1>
+    <nav>
+        <a href="user_dashboard.php">Dashboard</a>
+        <a href="all_resources.php">All Resources</a>
+        <a href="logout.php">Logout</a>
+    </nav>
+</header>
 
-    <div class="container">
-        <h2>Add a New Resource</h2>
+<div class="container">
+    <h2>Add a New Resource</h2>
 
-        <?= $message ?>
+    <?= $message ?>
 
-        <form method="POST" enctype="multipart/form-data">
-            <div style="margin-bottom: 20px;">
-                <label for="title">Title:</label><br>
-                <input type="text" name="title" id="title" required style="width: 30%;">
-            </div>
+    <form method="POST" enctype="multipart/form-data">
+        <label for="title">Title:</label>
+        <input type="text" name="title" id="title" required>
 
-            <div style="margin-bottom: 20px;">
-                <label for="description">Description:</label><br>
-                <textarea name="description" id="description" rows="4" required style="width: 30%;"></textarea>
-            </div>
+        <label for="description">Description:</label>
+        <textarea name="description" id="description" rows="4" required></textarea>
 
-            <div style="margin-bottom: 20px;">
-                <label for="category">Category:</label><br>
-                <select name="category" id="category" required style="width: 30%;">
-                    <option value="">--Select Category--</option>
-                    <option value="Textbook">Textbook</option>
-                    <option value="Notes">Notes</option>
-                    <option value="Stationery">Stationery</option>
-                    <option value="Other">Other</option>
-                </select>
-            </div>
+        <label for="category">Category:</label>
+        <select name="category" id="category" required>
+            <option value="">--Select Category--</option>
+            <option value="Textbook">Textbook</option>
+            <option value="Notes">Notes</option>
+            <option value="Stationery">Stationery</option>
+            <option value="Other">Other</option>
+        </select>
 
-            <div style="margin-bottom: 20px;">
-                <label for="image">Upload Image (optional):</label><br>
-                <input type="file" name="image" id="image" accept="image/*"><br>
-                <?= $image_preview ?>
-            </div>
+        <label for="image">Upload Image (optional):</label>
+        <input type="file" name="image" id="image" accept="image/*">
+        <?= $image_preview ?>
 
-            <div>
-                <button type="submit" style="padding: 10px 20px;">Upload Resource</button>
-            </div>
-        </form>
-    </div>
+        <br><br>
+        <button type="submit">Upload Resource</button>
+    </form>
+</div>
 
-    <footer>
-        <p>&copy; <?= date('Y'); ?> Book Exchange | All Rights Reserved</p>
-    </footer>
+<footer>
+    <p>&copy; <?= date('Y'); ?> Resource Exchange | Made with ❤️ by Students</p>
+</footer>
 </body>
 </html>

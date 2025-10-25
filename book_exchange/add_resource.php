@@ -46,3 +46,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </form>
 <br>
 <a href="user_dashboard.php">Back to Dashboard</a>
+<a href="contact_owner.php?owner_id=<?= $row['added_by'] ?>" class="book-btn">Contact Owner</a>

@@ -4,7 +4,6 @@ include 'db.php';
 
 // ✅ Check if admin is logged in
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
-    // Redirect to admin login page if not admin
     header("Location: admin_login.php");
     exit();
 }
@@ -15,10 +14,19 @@ if (isset($_GET['id']) && isset($_GET['action'])) {
     $action = $_GET['action'];
 
     if (in_array($action, ['approve','reject'])) {
-        $stmt = $conn->prepare("UPDATE resources SET status=? WHERE id=?");
-        $stmt->bind_param("si", $action, $id);
-        $stmt->execute();
-        $stmt->close();
+        // Map action to correct status value
+        $status = ($action === 'approve') ? 'approved' : 'rejected';
+
+        $stmt = $conn->prepare("UPDATE resources SET status=? WHERE resource_id=?");
+        if ($stmt) {
+            $stmt->bind_param("si", $status, $id);
+            $stmt->execute();
+            $stmt->close();
+
+            $_SESSION['message'] = "Resource has been $status successfully.";
+        } else {
+            $_SESSION['message'] = "Error: ".$conn->error;
+        }
     }
 }
 

@@ -8,18 +8,20 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Check if resource ID is provided
+$user_id = $_SESSION['user_id'];
+$message = '';
+$image_preview = '';
+
+// -------------------
+// Fetch resource
+// -------------------
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die("Invalid resource ID.");
 }
 
 $resource_id = intval($_GET['id']);
-$user_id = $_SESSION['user_id'];
-$message = '';
-$image_preview = '';
 
-// ✅ Fetch existing resource
-$stmt = $conn->prepare("SELECT * FROM resources WHERE resource_id=? AND user_id=?");
+$stmt = $conn->prepare("SELECT * FROM resources WHERE resource_id=? AND added_by=?");
 $stmt->bind_param("ii", $resource_id, $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -32,12 +34,14 @@ $resource = $result->fetch_assoc();
 $current_image = $resource['image'];
 $stmt->close();
 
-// ✅ Handle form submission
+// -------------------
+// Handle form submission
+// -------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title']);
     $description = trim($_POST['description']);
     $category = trim($_POST['category']);
-    $new_image_path = $current_image; // default: keep current image
+    $new_image_path = $current_image;
 
     // Handle new image upload
     if (!empty($_FILES['image']['name'])) {
@@ -56,8 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if (move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
                 $new_image_path = $target_file;
-
-                // Optional: delete old image if exists
                 if (!empty($current_image) && file_exists($current_image)) {
                     unlink($current_image);
                 }
@@ -67,16 +69,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ✅ Update resource in database if no error
+    // Update resource
     if ($message === '') {
-        $stmt = $conn->prepare("UPDATE resources SET title=?, description=?, category=?, image=? WHERE resource_id=? AND user_id=?");
+        $stmt = $conn->prepare("UPDATE resources SET title=?, description=?, category=?, image=? WHERE resource_id=? AND added_by=?");
         if (!$stmt) die("Prepare failed: " . $conn->error);
 
         $stmt->bind_param("ssssii", $title, $description, $category, $new_image_path, $resource_id, $user_id);
 
         if ($stmt->execute()) {
             $message = "<p class='success'>✅ Resource updated successfully.</p>";
-            $current_image = $new_image_path; // update preview
+            $current_image = $new_image_path;
         } else {
             $message = "<p class='error'>❌ Failed to update resource: " . $stmt->error . "</p>";
         }
@@ -85,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Prepare image preview
+// Image preview
 if (!empty($current_image) && file_exists($current_image)) {
     $image_preview = "<img src='" . htmlspecialchars($current_image) . "' width='150' style='margin-top:10px;' alt='Resource Image'>";
 }
@@ -96,61 +98,65 @@ $conn->close();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Edit Resource - Book Exchange</title>
-    <link rel="stylesheet" href="dashboard.css">
+<meta charset="UTF-8">
+<title>Edit Resource - Book Exchange</title>
+<link rel="stylesheet" href="dashboard.css">
+<style>
+.error { color: #e53935; font-weight:bold; }
+.success { color: #388e3c; font-weight:bold; }
+</style>
 </head>
 <body>
-    <header>
-        <h1>📚 Book Exchange - Edit Resource</h1>
-        <nav>
-            <a href="user_dashboard.php">Dashboard</a>
-            <a href="upload_resource.php">Add Resource</a>
-            <a href="logout.php">Logout</a>
-        </nav>
-    </header>
+<header>
+    <h1>📚 Resource Exchange - Edit Resource</h1>
+    <nav>
+        <a href="user_dashboard.php">Dashboard</a>
+        <a href="all_resources.php">All Resources</a>
+        <a href="logout.php">Logout</a>
+    </nav>
+</header>
 
-    <div class="container">
-        <h2>Edit Resource</h2>
+<div class="container">
+    <h2>Edit Resource</h2>
 
-        <?= $message ?>
+    <?= $message ?>
 
-        <form method="POST" enctype="multipart/form-data">
-            <div style="margin-bottom:20px;">
-                <label for="title">Title:</label><br>
-                <input type="text" name="title" id="title" value="<?= htmlspecialchars($resource['title']) ?>" required style="width:30%;">
-            </div>
+    <form method="POST" enctype="multipart/form-data">
+        <div style="margin-bottom:20px;">
+            <label for="title">Title:</label><br>
+            <input type="text" name="title" id="title" value="<?= htmlspecialchars($resource['title']) ?>" required style="width:30%;">
+        </div>
 
-            <div style="margin-bottom:20px;">
-                <label for="description">Description:</label><br>
-                <textarea name="description" id="description" rows="4" required style="width:30%;"><?= htmlspecialchars($resource['description']) ?></textarea>
-            </div>
+        <div style="margin-bottom:20px;">
+            <label for="description">Description:</label><br>
+            <textarea name="description" id="description" rows="4" required style="width:30%;"><?= htmlspecialchars($resource['description']) ?></textarea>
+        </div>
 
-            <div style="margin-bottom:20px;">
-                <label for="category">Category:</label><br>
-                <select name="category" id="category" required style="width:30%;">
-                    <option value="">--Select Category--</option>
-                    <option value="Textbook" <?= $resource['category']=='Textbook' ? 'selected':'' ?>>Textbook</option>
-                    <option value="Notes" <?= $resource['category']=='Notes' ? 'selected':'' ?>>Notes</option>
-                    <option value="Stationery" <?= $resource['category']=='Stationery' ? 'selected':'' ?>>Stationery</option>
-                    <option value="Other" <?= $resource['category']=='Other' ? 'selected':'' ?>>Other</option>
-                </select>
-            </div>
+        <div style="margin-bottom:20px;">
+            <label for="category">Category:</label><br>
+            <select name="category" id="category" required style="width:30%;">
+                <option value="">--Select Category--</option>
+                <option value="Textbook" <?= $resource['category']=='Textbook' ? 'selected':'' ?>>Textbook</option>
+                <option value="Notes" <?= $resource['category']=='Notes' ? 'selected':'' ?>>Notes</option>
+                <option value="Stationery" <?= $resource['category']=='Stationery' ? 'selected':'' ?>>Stationery</option>
+                <option value="Other" <?= $resource['category']=='Other' ? 'selected':'' ?>>Other</option>
+            </select>
+        </div>
 
-            <div style="margin-bottom:15px;">
-                <label for="image">Upload Image (optional):</label><br>
-                <input type="file" name="image" id="image" accept="image/*"><br>
-                <?= $image_preview ?>
-            </div>
+        <div style="margin-bottom:15px;">
+            <label for="image">Upload Image (optional):</label><br>
+            <input type="file" name="image" id="image" accept="image/*"><br>
+            <?= $image_preview ?>
+        </div>
 
-            <div>
-                <button type="submit" style="padding:10px 20px;">Update Resource</button>
-            </div>
-        </form>
-    </div>
+        <div>
+            <button type="submit" style="padding:10px 20px;">Update Resource</button>
+        </div>
+    </form>
+</div>
 
-    <footer>
-        <p>&copy; <?= date('Y'); ?> Book Exchange | All Rights Reserved</p>
-    </footer>
+<footer>
+    <p>&copy; <?= date('Y'); ?> Resource Exchange | All Rights Reserved</p>
+</footer>
 </body>
 </html>

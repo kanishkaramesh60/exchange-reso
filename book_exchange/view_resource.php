@@ -32,6 +32,14 @@ $result = $stmt->get_result();
     <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
+<header>
+    <h1>📚 Resource Exchange</h1>
+    <nav>
+        <a href="user_dashboard.php">Dashboard</a>
+        <a href="upload_resource.php">Add Resource</a>
+        <a href="logout.php">Logout</a>
+    </nav>
+</header>
 <h1>Available Resources</h1>
 <nav>
     <a href="user_dashboard.php">Dashboard</a> |
@@ -78,7 +86,9 @@ $result = $stmt->get_result();
         <tr><td colspan="7">No resources available.</td></tr>
     <?php endif; ?>
 </table>
-
+<footer>
+    <p>&copy; <?= date('Y'); ?> Resource Exchange | Made with ❤️ by Students</p>
+</footer>
 <?php $conn->close(); ?>
 </body>
 </html>
